@@ -21,7 +21,7 @@ static bool validation = false;
 
 static void check_mat_mul(float *a, float *b, float *c, int N, int M) {
   bool is_valid = true;
-/*
+
   for (int i = 0; i < N; ++i) {
     for (int j = 0; j < N; ++j) {
       float ans = 0;
@@ -37,7 +37,7 @@ static void check_mat_mul(float *a, float *b, float *c, int N, int M) {
       }
     }
   }
-*/
+
   if (is_valid) {
     printf("Validation:\tSUCCESS\n");
   }

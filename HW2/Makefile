@@ -2,7 +2,7 @@ CC = gcc
 TARGET = mat_mul
 OBJECTS = main.o mul.o timer.o
 
-CFLAGS = -std=c99 -Wall -pthread -O2 -mavx2 -mfma
+CFLAGS = -std=c99 -Wall -pthread -O2 -mavx2
 LDFLAGS = -lm -pthread
 
 MODE = single
@@ -10,7 +10,7 @@ DEVICE = cpu
 
 NDIM = 2048
 MDIM = 2048
-TEST = 2048
+TEST = 256
 
 all: $(TARGET)
 

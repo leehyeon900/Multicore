@@ -2,11 +2,13 @@
 //====================================================================
 // a[N][M] x b[M][N] = c[N][N], reversed??
 //====================================================================
-#include <x86intrin.h>
+#include <immintrin.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #define NUM_THREADS 16
+#define VBYTES 32
+//typedef float vec_t __attribute__((vector_size(VBYTES)));
 
 typedef struct {
     pthread_t thread_id;
@@ -22,6 +24,57 @@ typedef struct {
 //static pthread_t threads[NUM_THREADS];
 static pthread_mutex_t mutex;
 
+static void *cal_mat_avx(void *arg) {
+    thread_ptr tinfo  = (thread_ptr)arg;
+    float *a = tinfo->a;
+    float *b = tinfo->b;
+    float *c = tinfo->c;
+    int start = tinfo->start;
+    int end = tinfo->end;
+    int N = tinfo->N;
+    int M = tinfo->M;
+
+    for (int i = start; i < end; i++) {
+        for (int k = 0; k < M; k++) {
+            int a_idx = i * M + k;
+            __m256 a_vec = _mm256_broadcast_ss(a + a_idx);
+            //float a_mat = a[i * M + k];
+            for (int j = 0; j < N; j+=32) {
+                int c_idx = i * N + j;
+                int b_idx = k * N + j;
+                __m256 c_vec = _mm256_loadu_ps(c + c_idx);
+                __m256 c_vec1 = _mm256_loadu_ps(c + c_idx + 8);
+                __m256 c_vec2 = _mm256_loadu_ps(c + c_idx + 16);
+                __m256 c_vec3 = _mm256_loadu_ps(c + c_idx + 24);
+                
+                __m256 b_vec = _mm256_loadu_ps(b + b_idx);
+                __m256 b_vec1 = _mm256_loadu_ps(b + b_idx + 8);
+                __m256 b_vec2 = _mm256_loadu_ps(b + b_idx + 16);
+                __m256 b_vec3 = _mm256_loadu_ps(b + b_idx + 24);
+                
+                __m256 tmp = _mm256_mul_ps(a_vec, b_vec);
+                __m256 tmp1 = _mm256_mul_ps(a_vec, b_vec1);
+                __m256 tmp2 = _mm256_mul_ps(a_vec, b_vec2);
+                __m256 tmp3 = _mm256_mul_ps(a_vec, b_vec3);
+
+                c_vec = _mm256_add_ps(c_vec, tmp);
+                c_vec1 = _mm256_add_ps(c_vec1, tmp1);
+                c_vec2 = _mm256_add_ps(c_vec2, tmp2);
+                c_vec3 = _mm256_add_ps(c_vec3, tmp3);
+
+                _mm256_storeu_ps(c + c_idx, c_vec);
+                _mm256_storeu_ps(c + c_idx + 8, c_vec1);
+                _mm256_storeu_ps(c + c_idx + 16, c_vec2);
+                _mm256_storeu_ps(c + c_idx + 24, c_vec3);
+                //c[c_idx] += a_mat * b[b_idx];
+            }
+        }
+    }
+
+    pthread_exit(NULL);
+}
+
+
 static void *cal_mat(void *arg) {
     thread_ptr tinfo  = (thread_ptr)arg;
     float *a = tinfo->a;
@@ -35,8 +88,13 @@ static void *cal_mat(void *arg) {
     for (int i = start; i < end; i++) {
         for (int k = 0; k < M; k++) {
             float a_mat = a[i * M + k];
-            for (int j = 0; j < N; j++) {
-                c[i * N + j] += a_mat * b[k * N + j];
+            for (int j = 0; j < N; j+=4) {
+                int c_idx = i * N + j;
+                int b_idx = k * N + j;
+                c[c_idx] += a_mat * b[b_idx];
+                c[c_idx+1] += a_mat * b[b_idx+1];
+                c[c_idx+2] += a_mat * b[b_idx+2];
+                c[c_idx+3] += a_mat * b[b_idx+3];
             }
         }
     }
@@ -46,21 +104,11 @@ static void *cal_mat(void *arg) {
 
 
 
-
 void mat_mul(float *a, float *b, float *c, int N, int M) {
     thread_ptr tinfo;
     int offset, junk;
     void *status;
     pthread_attr_t attr;
-
-    /*
-     * N, M % 32 == 0?
-     */
-    if ((N & 0x1f) || (M & 0x1f)) {
-        fprintf(stderr, "mat_mul(): N, M are not multiples of 32\n");
-        exit(EXIT_FAILURE);
-    }
-
 
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
@@ -71,7 +119,6 @@ void mat_mul(float *a, float *b, float *c, int N, int M) {
         fprintf(stderr, "mat_mul(): tinfo allocation ERROR\n");
         exit(EXIT_FAILURE);
     }
-
 
     offset = N / NUM_THREADS;
     /*
@@ -86,7 +133,8 @@ void mat_mul(float *a, float *b, float *c, int N, int M) {
         tinfo[i].end = i * offset + offset;
         tinfo[i].N = N;
         tinfo[i].M = M;
-        junk = pthread_create(&tinfo[i].thread_id, &attr, &cal_mat, (void *)&tinfo[i]);
+        junk = pthread_create(&tinfo[i].thread_id, &attr, 
+        &cal_mat_avx, (void *)&tinfo[i]);
         if (junk) {
             fprintf(stderr, "mat_mul(): thread creation failed\n");
             exit(EXIT_FAILURE);
