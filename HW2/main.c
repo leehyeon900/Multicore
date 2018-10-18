@@ -158,8 +158,7 @@ int main(int argc, char *argv[]) {
   timer_start(0);
   mat_mul(a, b, c, N, M);
   double elapsed_time = timer_stop(0);
-  printf("done!\n");
-
+  
   //===============================================================
   // Print results and Validation
   //===============================================================

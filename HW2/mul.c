@@ -7,8 +7,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #define NUM_THREADS 16
-#define VBYTES 32
-//typedef float vec_t __attribute__((vector_size(VBYTES)));
 
 typedef struct {
     pthread_t thread_id;
@@ -21,8 +19,7 @@ typedef struct {
     int M;
 }thread_info, *thread_ptr;
 
-//static pthread_t threads[NUM_THREADS];
-static pthread_mutex_t mutex;
+
 
 static void *cal_mat_avx(void *arg) {
     thread_ptr tinfo  = (thread_ptr)arg;
@@ -73,8 +70,7 @@ static void *cal_mat_avx(void *arg) {
 
     pthread_exit(NULL);
 }
-
-
+/*
 static void *cal_mat(void *arg) {
     thread_ptr tinfo  = (thread_ptr)arg;
     float *a = tinfo->a;
@@ -101,8 +97,7 @@ static void *cal_mat(void *arg) {
 
     pthread_exit(NULL);
 }
-
-
+*/
 
 void mat_mul(float *a, float *b, float *c, int N, int M) {
     thread_ptr tinfo;
@@ -112,7 +107,6 @@ void mat_mul(float *a, float *b, float *c, int N, int M) {
 
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    pthread_mutex_init(&mutex, NULL);
 
     tinfo = (thread_ptr)malloc(NUM_THREADS * sizeof(thread_info));
     if (tinfo == NULL) {
@@ -121,9 +115,6 @@ void mat_mul(float *a, float *b, float *c, int N, int M) {
     }
 
     offset = N / NUM_THREADS;
-    /*
-     * Initialize data on each threads and create
-     */
     for (int i = 0; i < NUM_THREADS; i++) {
         tinfo[i].thread_id = 0;
         tinfo[i].a = a;
@@ -148,7 +139,6 @@ void mat_mul(float *a, float *b, float *c, int N, int M) {
     }
 
     free(tinfo);
-    pthread_mutex_destroy(&mutex);
 }
 
 void mat_mul_cache(float *a, float *b, float *c, int N, int M) {
@@ -165,9 +155,11 @@ void mat_mul_cache(float *a, float *b, float *c, int N, int M) {
 void mat_mul_original(float *a, float *b, float *c, int N, int M) {
   for (int i = 0; i < N; i++) {
     for (int j = 0; j < N; j++) {
+        float sum = 0.0f;
       for (int k = 0; k < M; k++) {
-        c[i * N + j] += a[i * M + k] * b[k * N + j];
+        sum += a[i * M + k] * b[k * N + j];
       }
+      c[i * N + j] = sum;
     }
   }
 }

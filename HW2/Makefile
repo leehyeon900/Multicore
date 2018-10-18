@@ -2,7 +2,8 @@ CC = gcc
 TARGET = mat_mul
 OBJECTS = main.o mul.o timer.o
 
-CFLAGS = -std=c99 -Wall -pthread -O2 -mavx2
+CFLAGS = -std=c99 -Wall -pthread -ftree-vectorize -O3 -mavx2 -march=native
+#CFLAGS = -std=c99 -Wall -pthread -O2
 LDFLAGS = -lm -pthread
 
 MODE = single
@@ -16,7 +17,8 @@ all: $(TARGET)
 
 $(TARGET): $(OBJECTS)
 	$(CC) -o $@ $^ $(LDFLAGS)
-	./$(TARGET) $(TEST) $(TEST) -v
+	#./$(TARGET) $(TEST) $(TEST) -v
+	objdump -d $(TARGET) > dis
 
 .PHONY: clean run
 
